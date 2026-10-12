@@ -19,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-The code in this repository is MIT licensed. The data it processes is published by
-Deutsche Bahn under CC BY 4.0 and made available by Piet Brömmel at
-https://huggingface.co/datasets/piebro/deutsche-bahn-data. The data is not part of
-this repository.
