@@ -1,0 +1,28 @@
+services:
+  # Batch pipeline: download -> bronze -> silver -> gold -> quality -> features -> train -> report
+  pipeline:
+    build: .
+    image: db-punctuality-lakehouse:latest
+    command: ["make", "all"]
+    environment:
+      # optional overrides, e.g.  DBPIPE_MONTHS=2025-08,2025-09,2025-10 docker compose run --rm pipeline
+      DBPIPE_MONTHS: ${DBPIPE_MONTHS:-}
+      DBPIPE_DRIVER_MEMORY: ${DBPIPE_DRIVER_MEMORY:-4g}
+    volumes:
+      - ./data:/app/data            # downloaded files + lakehouse tables stay on your disk
+      - ./artifacts:/app/artifacts  # model + metrics
+      - ./docs:/app/docs            # generated RESULTS.md + charts
+
+  # Dashboard on http://127.0.0.1:8501 (run the pipeline first)
+  dashboard:
+    image: db-punctuality-lakehouse:latest
+    build: .
+    command: ["streamlit", "run", "dashboard/app.py", "--server.address=0.0.0.0", "--server.port=8501",
+              "--server.headless=true", "--server.fileWatcherType=none", "--browser.gatherUsageStats=false"]
+    ports:
+      # IPv4 loopback only: reachable from this computer only, and avoids Docker Desktop on Windows
+      # hanging when the browser tries "localhost" over IPv6 (::1) first
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - ./data:/app/data:ro
+      - ./artifacts:/app/artifacts:ro

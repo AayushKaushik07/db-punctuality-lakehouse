@@ -1,0 +1,15 @@
+# Runtime dependencies (pinned for reproducible runs)
+pyspark==4.0.1
+delta-spark==4.0.0
+deltalake==1.6.6
+pandas==2.3.3
+pyarrow==25.0.1
+numpy==2.4.6
+scikit-learn==1.9.1
+joblib==1.6.0
+matplotlib==3.11.2
+plotly==7.1.0
+streamlit==1.64.0
+holidays==0.105
+PyYAML==6.0.3
+huggingface_hub==2.0.0

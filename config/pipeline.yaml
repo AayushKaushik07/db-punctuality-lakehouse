@@ -1,0 +1,53 @@
+# Pipeline configuration.
+# Every value can be overridden with an environment variable (see src/dbpipe/config.py),
+# e.g.  DBPIPE_MONTHS="2025-09,2025-10"  or  DBPIPE_STORAGE_FORMAT=parquet
+
+dataset:
+  # Public dataset on Hugging Face (CC BY 4.0, data by Deutsche Bahn)
+  hf_repo_id: piebro/deutsche-bahn-data
+  # Monthly files to process: one full year, November 2024 - October 2025 (~1.2 GB, ~24 M rows).
+  # Until 2025-10 each file covers the ~100 biggest stations (~100 MB). From 2025-11 onwards
+  # files cover ALL stations (~600 MB). Don't mix both periods in one analysis: adding
+  # thousands of small (more punctual) stations would look like a jump in punctuality.
+  months: ["2024-11", "2024-12", "2025-01", "2025-02", "2025-03", "2025-04",
+           "2025-05", "2025-06", "2025-07", "2025-08", "2025-09", "2025-10"]
+
+paths:
+  landing: data/landing        # raw downloaded parquet files (untouched)
+  lakehouse: data/lakehouse    # bronze / silver / gold tables
+  reference: reference         # small static reference data checked into git
+  artifacts: artifacts         # model, metrics, model charts
+  docs: docs                   # generated docs/RESULTS.md and docs/images/
+
+storage:
+  format: delta                # delta | parquet  (parquet = no extra jars, used by unit tests)
+
+spark:
+  # At most 6 parallel tasks: every task needs memory outside the Java heap (Parquet buffers),
+  # and "local[*]" (one task per CPU thread, e.g. 16) ran a 16 GB laptop out of memory on a year
+  # of data. Raise it (e.g. "local[12]") on machines with plenty of RAM.
+  master: "local[6]"
+  driver_memory: 4g            # Java heap; keep well below the memory Docker/WSL has
+  shuffle_partitions: 64       # smaller pieces per task -> less memory per task on ~24 M rows
+  timezone: Europe/Berlin      # source timestamps are German local time
+
+quality:
+  max_null_key_rate: 0.01          # share of rows allowed to miss a key column
+  max_quarantine_rate: 0.02        # share of rows allowed to fail validation
+  min_delay_agreement_rate: 0.90   # recomputed delay vs. published delay_in_min
+
+analytics:
+  punctual_threshold_min: 6        # DB definition: punctual = less than 6 min late
+  long_distance_types: [ICE, IC, EC, ECE, EN, NJ, RJ, RJX, FLX, TGV, EST, WB, ES]
+  s_bahn_types: [S]
+  bus_types: [BUS, Bus, SEV]
+  min_segment_observations: 200    # min trains per segment for the hotspot ranking
+  min_segment_planned_min: 10      # ignore very short hops (whole-minute delays make them noisy)
+  min_station_arrivals: 500        # min arrivals per month for a station to be ranked
+
+ml:
+  label_threshold_min: 6           # label: arrival delay >= 6 min (= not punctual)
+  test_days: 31                    # last N days are the hold-out test set (= October 2025)
+  warmup_days: 7                   # first N days dropped (rolling features not filled yet)
+  max_rows: 1500000                # cap on rows pulled into pandas for scikit-learn
+  random_state: 42

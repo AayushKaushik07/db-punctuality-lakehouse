@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    name: Lint + unit/integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Tests
+        run: pytest
+
+  pipeline-delta:
+    name: End-to-end pipeline on Delta Lake (synthetic sample)
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    env:
+      DBPIPE_STORAGE_FORMAT: delta
+      DBPIPE_LANDING_PATH: data/sample/landing
+      DBPIPE_LAKEHOUSE_PATH: data/sample/lakehouse
+      DBPIPE_ARTIFACTS_PATH: data/sample/artifacts
+      DBPIPE_DOCS_PATH: data/sample/docs
+      DBPIPE_DRIVER_MEMORY: 2g
+      # two synthetic months are enough to exercise every stage quickly
+      DBPIPE_MONTHS: 2025-09,2025-10
+      DBPIPE_TEST_DAYS: "10"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Cache Delta Lake jars
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ivy2
+            ~/.ivy2.5.2
+          key: ivy-delta-${{ hashFiles('requirements.txt') }}
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Generate synthetic sample
+        run: python -m dbpipe sample
+      - name: Run pipeline (bronze -> report)
+        run: python -m dbpipe run
+      - name: Re-run is idempotent and incremental
+        run: python -m dbpipe bronze
+      - name: Upload generated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-report
+          path: data/sample/docs/
+
+  docker:
+    name: Docker image builds
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t db-punctuality-lakehouse:ci .
+      - name: Smoke test inside the container
+        run: |
+          docker run --rm \
+            -e DBPIPE_LANDING_PATH=/tmp/s/landing -e DBPIPE_LAKEHOUSE_PATH=/tmp/s/lakehouse \
+            -e DBPIPE_ARTIFACTS_PATH=/tmp/s/artifacts -e DBPIPE_DOCS_PATH=/tmp/s/docs \
+            -e DBPIPE_DRIVER_MEMORY=2g -e DBPIPE_MONTHS=2025-09,2025-10 -e DBPIPE_TEST_DAYS=10 \
+            db-punctuality-lakehouse:ci \
+            sh -c "python -m dbpipe sample --sample-days 30 --sample-rides 80 && python -m dbpipe run"

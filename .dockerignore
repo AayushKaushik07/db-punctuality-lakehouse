@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+venv
+data
+artifacts
+**/__pycache__
+.pytest_cache
+.ruff_cache
+spark-warehouse
+metastore_db
+*.egg-info

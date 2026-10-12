@@ -1,0 +1,5 @@
+# Keep Unix line endings everywhere: the code runs inside a Linux container, and
+# Windows (CRLF) line endings would break the Makefile and shell commands there.
+* text=auto eol=lf
+*.png binary
+*.parquet binary
